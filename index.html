@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Pipeline</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🫧</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#1a1240; --b1:#7c5cff; --b2:#ff6fb5; --b3:#22d3ee; --b4:#ffb86b;
+  --glass:rgba(255,255,255,.09); --glass-2:rgba(255,255,255,.15); --line:rgba(255,255,255,.2);
+  --ink:#f7f5ff; --ink-2:rgba(247,245,255,.68); --ink-3:rgba(247,245,255,.45);
+  --field:rgba(10,6,30,.35);
+  --s-new:#22d3ee; --s-called:#a78bfa; --s-noans:#fbbf24; --s-follow:#ff6fb5; --s-int:#34d399; --s-conv:#a3e635; --s-lost:#94a3b8;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){
+  --bg:#efe9ff; --glass:rgba(255,255,255,.55); --glass-2:rgba(255,255,255,.75); --line:rgba(80,50,160,.16);
+  --ink:#1d1640; --ink-2:rgba(29,22,64,.7); --ink-3:rgba(29,22,64,.48); --field:rgba(255,255,255,.6);
+  --s-new:#0891b2; --s-called:#7c3aed; --s-noans:#b45309; --s-follow:#db2777; --s-int:#059669; --s-conv:#4d7c0f; --s-lost:#64748b;
+}}
+:root[data-theme="dark"]{--bg:#1a1240}
+*,*::before,*::after{box-sizing:border-box}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:15px/1.5 "DM Sans",system-ui,sans-serif;overflow-x:hidden}
+.blobs{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.blobs i{position:absolute;border-radius:50%;filter:blur(90px);opacity:.55}
+.blobs i:nth-child(1){width:46vw;height:46vw;background:var(--b1);top:-12vw;left:-8vw}
+.blobs i:nth-child(2){width:38vw;height:38vw;background:var(--b2);top:18vh;right:-10vw}
+.blobs i:nth-child(3){width:34vw;height:34vw;background:var(--b3);bottom:-14vw;left:22vw;opacity:.4}
+.blobs i:nth-child(4){width:22vw;height:22vw;background:var(--b4);bottom:6vh;right:12vw;opacity:.35}
+.app{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:22px 24px 40px}
+.glass{background:var(--glass);border:1px solid var(--line);border-radius:20px;backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--b3);outline-offset:2px}
+
+header{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:26px;letter-spacing:-.02em;margin:0;display:flex;align-items:center;gap:10px}
+.brand span{width:28px;height:28px;border-radius:9px;background:conic-gradient(from 200deg,var(--b1),var(--b2),var(--b4),var(--b3),var(--b1))}
+.demo{font-size:12px;padding:3px 10px;border-radius:99px;border:1px dashed var(--line);color:var(--ink-2)}
+.search{flex:1;min-width:240px;display:flex;align-items:center;gap:10px;padding:0 16px;height:48px;border-radius:16px}
+.search input{flex:1;background:none;border:0;outline:0;font-size:16px}
+.search input::placeholder{color:var(--ink-3)}
+.search kbd{font:12px "DM Sans";color:var(--ink-3);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+.toggle{display:flex;padding:4px;border-radius:14px;gap:4px}
+.toggle button{border:0;background:none;padding:8px 14px;border-radius:10px;color:var(--ink-2);font-weight:500}
+.toggle button[aria-pressed="true"]{background:var(--glass-2);color:var(--ink)}
+.btn{border:1px solid var(--line);background:var(--glass);padding:10px 14px;border-radius:12px;font-weight:500;display:inline-flex;gap:8px;align-items:center}
+.btn:hover{background:var(--glass-2)}
+.btn.primary{background:linear-gradient(120deg,var(--b1),var(--b2));border-color:transparent;color:#fff}
+
+.funnel{margin-top:20px;padding:18px 20px}
+.funnel-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.funnel-head h2{font-family:"Bricolage Grotesque";font-weight:500;font-size:18px;margin:0}
+.funnel-head p{margin:0;color:var(--ink-2);font-size:14px}
+.funnel-head b{font-family:"Bricolage Grotesque";font-size:22px;color:var(--ink)}
+.bar{display:flex;height:14px;border-radius:99px;overflow:hidden;gap:3px}
+.bar div{transition:flex-grow .4s}
+.stages{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-top:14px}
+.stage{border:0;background:none;text-align:left;padding:8px 10px;border-radius:12px;color:var(--ink-2);font-size:13px}
+.stage:hover,.stage[aria-pressed="true"]{background:var(--glass-2);color:var(--ink)}
+.stage strong{display:block;font-family:"Bricolage Grotesque";font-size:24px;font-weight:500;color:var(--ink);line-height:1.2}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+
+.main{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;margin-top:20px;align-items:start}
+.today{padding:18px}
+.today h3,.panel-title{font-family:"Bricolage Grotesque";font-weight:500;font-size:17px;margin:0 0 4px}
+.today .sub{color:var(--ink-3);font-size:13px;margin:0 0 12px}
+.tcard{display:flex;gap:10px;align-items:center;padding:10px;border-radius:14px;border:1px solid transparent;cursor:pointer}
+.tcard:hover{background:var(--glass-2);border-color:var(--line)}
+.av{flex:none;width:36px;height:36px;border-radius:12px;display:grid;place-items:center;font-weight:600;font-size:13px;color:#fff}
+.tcard .who{flex:1;min-width:0}
+.tcard .who b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tcard .who small{color:var(--ink-3)}
+.late{color:var(--s-follow);font-size:12px;font-weight:600}
+.icon-btn{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--glass);display:grid;place-items:center;text-decoration:none;color:var(--ink)}
+.icon-btn:hover{background:var(--glass-2)}
+
+.board{padding:6px;min-height:400px}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:780px}
+th{white-space:nowrap;text-align:left;font-weight:500;color:var(--ink-3);font-size:13px;padding:12px 14px}
+td{padding:12px 14px;border-top:1px solid var(--line);vertical-align:middle}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:rgba(255,255,255,.05)}
+.namecell{display:flex;gap:10px;align-items:center}
+.namecell b{font-weight:500}
+.namecell small{display:block;color:var(--ink-3)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;font-size:12.5px;font-weight:500;border:1px solid currentColor;background:color-mix(in srgb,currentColor 14%,transparent)}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:8px;background:var(--glass-2);margin:2px 4px 2px 0;color:var(--ink-2)}
+.muted{color:var(--ink-3)}
+
+.kanban{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,1fr);gap:12px;overflow-x:auto;padding:8px}
+.col{border-radius:16px;padding:10px;background:rgba(255,255,255,.04);min-height:360px;border:1px solid transparent}
+.col.over{border-color:var(--line);background:var(--glass-2)}
+.col h4{margin:4px 6px 10px;font-size:13.5px;font-weight:600;display:flex;justify-content:space-between}
+.kcard{background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:11px;margin-bottom:8px;cursor:grab}
+.kcard:active{cursor:grabbing}
+.kcard b{font-weight:500;display:block}
+.kcard small{color:var(--ink-3)}
+
+.scrim{position:fixed;inset:0;background:rgba(8,4,24,.45);opacity:0;pointer-events:none;transition:opacity .25s;z-index:5}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);z-index:6;transform:translateX(105%);transition:transform .3s cubic-bezier(.2,.8,.2,1);border-radius:24px 0 0 24px;padding:calc(22px + env(safe-area-inset-top,0px)) 24px calc(22px + env(safe-area-inset-bottom,0px));overflow-y:auto;background:color-mix(in srgb,var(--bg) 70%,transparent)}
+.drawer.on{transform:none}
+.dhead{display:flex;gap:14px;align-items:center;margin-bottom:18px}
+.dhead .av{width:52px;height:52px;border-radius:16px;font-size:17px}
+.dhead h2{font-family:"Bricolage Grotesque";font-weight:500;font-size:22px;margin:0}
+.dhead p{margin:0;color:var(--ink-3);font-size:14px}
+.close{margin-left:auto}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:13px;color:var(--ink-3);margin-bottom:6px}
+.field select,.field input,.field textarea{width:100%;background:var(--field);border:1px solid var(--line);border-radius:12px;padding:10px 12px;outline:none}
+.field textarea{min-height:90px;resize:vertical}
+.info{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px;margin-bottom:18px;padding:14px;border-radius:14px;background:rgba(255,255,255,.05)}
+.info dt{color:var(--ink-3)}
+.info dd{margin:0}
+.actions{display:flex;gap:8px;margin-bottom:20px}
+.actions .btn{flex:1;justify-content:center;text-decoration:none}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;transition:.25s;z-index:9;padding:10px 18px;border-radius:14px}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.empty{text-align:center;color:var(--ink-3);padding:60px 20px}
+@media (max-width:900px){.main{grid-template-columns:1fr}.stages{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.more{display:flex;justify-content:center;padding:14px}
+.kmore{font-size:12.5px;color:var(--ink-3);text-align:center;padding:6px}
+.links{display:flex;gap:8px;flex-wrap:wrap;margin:-6px 0 18px}
+.links a{font-size:13px;color:var(--ink);text-decoration:none;padding:5px 10px;border-radius:10px;border:1px solid var(--line);background:var(--glass)}
+.links a:hover{background:var(--glass-2)}
+.welcome{max-width:520px;margin:70px auto;text-align:center;padding:36px 28px}
+.welcome h2{font-family:"Bricolage Grotesque";font-weight:500;font-size:26px;margin:0 0 8px}
+.welcome p{color:var(--ink-2);margin:0 0 22px}
+footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:22px;color:var(--ink-3);font-size:13px}
+.linkbtn{background:none;border:0;color:var(--ink-3);text-decoration:underline;padding:0}
+.linkbtn:hover{color:var(--s-follow)}
+.count{color:var(--ink-3);font-size:13px;padding:10px 14px 0}
+</style>
+</head>
+<body>
+<div class="blobs" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<div class="app">
+  <header>
+    <h1 class="brand"><span aria-hidden="true"></span>Pipeline</h1>
+    <label class="search glass">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Search name, number or city" aria-label="Search leads" autocomplete="off">
+      <kbd>/</kbd>
+    </label>
+    <div class="toggle glass" role="group" aria-label="View">
+      <button id="vTable" aria-pressed="true">Table</button>
+      <button id="vKanban" aria-pressed="false">Kanban</button>
+    </div>
+    <button class="btn" id="importBtn">Import leads</button>
+    <button class="btn" id="backupBtn">Export backup</button>
+    <input type="file" id="file" accept=".json,application/json" hidden>
+  </header>
+
+  <div id="appBody" hidden>
+    <section class="funnel glass">
+      <div class="funnel-head">
+        <h2>Your pipeline</h2>
+        <p><b id="total">0</b> leads &nbsp; <b id="convRate">0%</b> converted</p>
+      </div>
+      <div class="bar" id="bar"></div>
+      <div class="stages" id="stages"></div>
+    </section>
+    <div class="main">
+      <aside class="today glass">
+        <h3>Today's calls</h3>
+        <p class="sub" id="todaySub"></p>
+        <div id="todayList"></div>
+      </aside>
+      <section class="board glass">
+        <div id="tableView"></div>
+        <div id="kanbanView" class="kanban" hidden></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="welcome glass" id="welcome" hidden>
+    <h2>Start with your leads file</h2>
+    <p>Import the clean leads file or a backup. Everything stays in this browser on this device.</p>
+    <button class="btn primary" id="welcomeImport">Import leads</button>
+  </section>
+
+  <footer>
+    <span id="saveInfo">Data is stored only in this browser.</span>
+    <button class="linkbtn" id="wipe">Delete all data from this browser</button>
+  </footer>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer glass" id="drawer" aria-label="Lead details"></aside>
+<div class="toast glass" id="toast" role="status"></div>
+
+<script>
+const STAGES=[["New","--s-new"],["Called","--s-called"],["No Answer","--s-noans"],["Follow-up","--s-follow"],["Interested","--s-int"],["Converted","--s-conv"],["Lost","--s-lost"]];
+const STAGE_NAMES=STAGES.map(s=>s[0]);
+const PAGE=100, KCAP=40, TCAP=40;
+const color=s=>`var(${(STAGES.find(x=>x[0]===s)||STAGES[0])[1]})`;
+const localISO=(dt=new Date())=>new Date(dt.getTime()-dt.getTimezoneOffset()*60000).toISOString().slice(0,10);
+const TODAY=localISO();
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeUrl=u=>/^https?:\/\//i.test(u||"")?u:"";
+const validPhone=p=>/^[6-9]\d{9}$/.test(p||"");
+const fmtDate=s=>s?new Date(s+"T00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short"}):"";
+const grads=[["#7c5cff","#ff6fb5"],["#22d3ee","#7c5cff"],["#ff6fb5","#ffb86b"],["#34d399","#22d3ee"],["#ffb86b","#ff6fb5"]];
+const hash=s=>{let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))|0;return Math.abs(h)};
+const initials=n=>(n||"?").split(/\s+/).filter(Boolean).map(w=>w[0]).join("").slice(0,2).toUpperCase();
+const av=l=>{const g=grads[hash(l.id)%grads.length];return `<div class="av" style="background:linear-gradient(135deg,${g[0]},${g[1]})">${esc(initials(l.name))}</div>`};
+const pill=s=>`<span class="pill" style="color:${color(s)}">${esc(s)}</span>`;
+
+/* storage: IndexedDB */
+const DB={
+  _db:null,
+  open(){return this._db||(this._db=new Promise((res,rej)=>{const r=indexedDB.open("pipeline",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}))},
+  async get(k){const db=await this.open();return new Promise((res,rej)=>{const q=db.transaction("kv").objectStore("kv").get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
+  async set(k,v){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction("kv","readwrite");t.objectStore("kv").put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})},
+  async del(k){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction("kv","readwrite");t.objectStore("kv").delete(k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})}
+};
+let leads=[], storageOk=true, saveTimer;
+function save(){clearTimeout(saveTimer);saveTimer=setTimeout(async()=>{try{await DB.set("leads",leads);storageOk=true;$("saveInfo").textContent="Saved in this browser at "+new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}catch(e){storageOk=false;$("saveInfo").textContent="Couldn't save in this browser. Export a backup now.";}},300)}
+
+/* state */
+let view="table",stageFilter=null,q="",shown=PAGE;
+function normLead(x){return{
+  id:String(x.id||x.phone||Math.random().toString(36).slice(2)),
+  name:String(x.name||"").trim(),phone:String(x.phone||"").replace(/\D/g,"").slice(-10),
+  cert:x.cert||"",city:x.city||"",state:x.state||"",exp:x.exp??null,clients:x.clients??null,
+  spec:x.spec||"",lang:x.lang||"",mode:x.mode||"",
+  instagram:safeUrl(x.instagram),linkedin:safeUrl(x.linkedin),youtube:safeUrl(x.youtube),
+  status:STAGE_NAMES.includes(x.status)?x.status:"New",follow:/^\d{4}-\d{2}-\d{2}$/.test(x.follow||"")?x.follow:"",
+  tags:Array.isArray(x.tags)?x.tags.map(String):[],notes:String(x.notes||""),updated:x.updated||""
+}}
+function searchText(l){return (l.name+" "+l.phone+" "+l.city+" "+l.state).toLowerCase()}
+function filtered(){
+  const t=q.trim().toLowerCase();
+  return leads.filter(l=>(!stageFilter||l.status===stageFilter)&&(!t||(l._s||(l._s=searchText(l))).includes(t)));
+}
+function renderFunnel(){
+  const c=Object.fromEntries(STAGE_NAMES.map(s=>[s,0]));leads.forEach(l=>c[l.status]++);
+  $("total").textContent=leads.length.toLocaleString("en-IN");
+  $("convRate").textContent=(leads.length?Math.round(c.Converted/leads.length*1000)/10:0)+"%";
+  $("bar").innerHTML=STAGES.map(([s,v])=>`<div style="flex-grow:${c[s]};background:var(${v})" title="${s}: ${c[s]}"></div>`).join("");
+  $("stages").innerHTML=STAGES.map(([s,v])=>`<button class="stage" data-s="${s}" aria-pressed="${stageFilter===s}"><strong>${c[s].toLocaleString("en-IN")}</strong><span class="dot" style="background:var(${v})"></span>${s}</button>`).join("");
+}
+function callIcon(l){return validPhone(l.phone)?`<a class="icon-btn" href="tel:+91${l.phone}" aria-label="Call ${esc(l.name)}" data-stop><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></a>`:""}
+function renderToday(){
+  const due=leads.filter(l=>l.follow&&l.follow<=TODAY&&l.status!=="Converted"&&l.status!=="Lost").sort((a,b)=>a.follow.localeCompare(b.follow));
+  $("todaySub").textContent=due.length?`${due.length} follow-up${due.length>1?"s":""} due`:"No follow-ups due today. Set a date on any lead to see it here.";
+  $("todayList").innerHTML=due.slice(0,TCAP).map(l=>`<div class="tcard" tabindex="0" data-id="${esc(l.id)}">${av(l)}<div class="who"><b>${esc(l.name)}</b><small>${esc(l.city||l.phone)} ${l.follow<TODAY?`<span class="late">overdue</span>`:""}</small></div>${callIcon(l)}</div>`).join("")+(due.length>TCAP?`<div class="kmore">+${due.length-TCAP} more</div>`:"");
+}
+function renderTable(){
+  const rows=filtered();
+  if(!rows.length){$("tableView").innerHTML=`<div class="empty">No leads match${q?` "${esc(q)}"`:""}. Try a name, number or city.</div>`;return}
+  const page=rows.slice(0,shown);
+  $("tableView").innerHTML=`<p class="count">Showing ${page.length.toLocaleString("en-IN")} of ${rows.length.toLocaleString("en-IN")}</p><div class="tablewrap"><table><thead><tr><th>Coach</th><th>Mobile</th><th>Certifications</th><th>Status</th><th>Follow-up</th><th>Tags</th></tr></thead><tbody>${page.map(l=>`<tr tabindex="0" data-id="${esc(l.id)}"><td><div class="namecell">${av(l)}<div><b>${esc(l.name)}</b><small>${esc(l.city)}${l.exp!=null?` · ${esc(l.exp)} yrs`:""}</small></div></div></td><td>${esc(l.phone)}</td><td class="muted">${esc(l.cert.length>90?l.cert.slice(0,90)+"…":l.cert)}</td><td>${pill(l.status)}</td><td>${l.follow?(l.follow<TODAY&&l.status!=="Converted"&&l.status!=="Lost"?`<span class="late">${fmtDate(l.follow)}</span>`:fmtDate(l.follow)):`<span class="muted">–</span>`}</td><td>${l.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</td></tr>`).join("")}</tbody></table></div>${rows.length>shown?`<div class="more"><button class="btn" id="moreBtn">Show ${Math.min(PAGE,rows.length-shown)} more</button></div>`:""}`;
+  const m=$("moreBtn");if(m)m.onclick=()=>{shown+=PAGE;renderTable()};
+}
+function renderKanban(){
+  const rows=filtered();
+  $("kanbanView").innerHTML=STAGES.map(([s,v])=>{const items=rows.filter(l=>l.status===s);return `<div class="col" data-s="${s}"><h4><span><span class="dot" style="background:var(${v})"></span>${s}</span><span class="muted">${items.length.toLocaleString("en-IN")}</span></h4>${items.slice(0,KCAP).map(l=>`<div class="kcard" tabindex="0" draggable="true" data-id="${esc(l.id)}"><b>${esc(l.name)}</b><small>${esc(l.city)}${l.follow?` · ${fmtDate(l.follow)}`:""}</small><div>${l.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div></div>`).join("")}${items.length>KCAP?`<div class="kmore">+${(items.length-KCAP).toLocaleString("en-IN")} more. Search to narrow down.</div>`:""}</div>`}).join("");
+}
+function render(){
+  const has=leads.length>0;$("appBody").hidden=!has;$("welcome").hidden=has;
+  if(!has)return;
+  renderFunnel();renderToday();view==="table"?renderTable():renderKanban();
+}
+
+/* drawer */
+let lastFocus=null;
+function openLead(id){
+  const l=leads.find(x=>x.id===id);if(!l)return;lastFocus=document.activeElement;
+  const links=[["Instagram",l.instagram],["LinkedIn",l.linkedin],["YouTube",l.youtube]].filter(x=>x[1]);
+  $("drawer").innerHTML=`<div class="dhead">${av(l)}<div><h2>${esc(l.name)}</h2><p>${esc([l.city,l.state].filter(Boolean).join(", "))}</p></div><button class="icon-btn close" id="closeD" aria-label="Close">&times;</button></div>
+  ${validPhone(l.phone)?`<div class="actions"><a class="btn primary" href="tel:+91${l.phone}">Call</a><a class="btn" href="https://wa.me/91${l.phone}" target="_blank" rel="noopener noreferrer">WhatsApp</a></div>`:`<p class="muted">No valid mobile number on this lead.</p>`}
+  ${links.length?`<div class="links">${links.map(([n,u])=>`<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${n}</a>`).join("")}</div>`:""}
+  <dl class="info"><dt>Mobile</dt><dd>${esc(l.phone)||"–"}</dd><dt>Certs</dt><dd>${esc(l.cert)||"–"}</dd>${l.exp!=null?`<dt>Experience</dt><dd>${esc(l.exp)} years</dd>`:""}${l.clients!=null?`<dt>Clients</dt><dd>${esc(l.clients)}</dd>`:""}${l.spec?`<dt>Focus</dt><dd>${esc(l.spec)}</dd>`:""}${l.lang?`<dt>Languages</dt><dd>${esc(l.lang)}</dd>`:""}${l.mode?`<dt>Mode</dt><dd>${esc(l.mode)}</dd>`:""}</dl>
+  <div class="field"><label for="fStatus">Status</label><select id="fStatus">${STAGE_NAMES.map(s=>`<option ${s===l.status?"selected":""}>${s}</option>`).join("")}</select></div>
+  <div class="field"><label for="fDate">Follow-up date</label><input type="date" id="fDate" value="${esc(l.follow)}"></div>
+  <div class="field"><label for="fTags">Tags (comma separated)</label><input id="fTags" value="${esc(l.tags.join(", "))}" placeholder="Hot, Online"></div>
+  <div class="field"><label for="fNotes">Notes</label><textarea id="fNotes" placeholder="Kya baat hui, next step kya hai">${esc(l.notes)}</textarea></div>
+  <button class="btn primary" id="saveD" style="width:100%;justify-content:center">Save changes</button>`;
+  $("drawer").classList.add("on");$("scrim").classList.add("on");
+  $("closeD").onclick=closeLead;
+  $("saveD").onclick=()=>{l.status=$("fStatus").value;l.follow=$("fDate").value;l.tags=[...new Set($("fTags").value.split(",").map(t=>t.trim()).filter(Boolean))];l.notes=$("fNotes").value;l.updated=new Date().toISOString();save();closeLead();render();toast("Saved")};
+  $("fStatus").focus();
+}
+function closeLead(){if(!$("drawer").classList.contains("on"))return;$("drawer").classList.remove("on");$("scrim").classList.remove("on");if(lastFocus&&lastFocus.focus)lastFocus.focus()}
+let tt;function toast(m){$("toast").textContent=m;$("toast").classList.add("on");clearTimeout(tt);tt=setTimeout(()=>$("toast").classList.remove("on"),2200)}
+
+/* import / backup */
+async function handleFile(file){
+  let data;
+  try{data=JSON.parse(await file.text())}catch(e){toast("That file isn't valid JSON. Pick leads_clean.json or a backup file.");return}
+  const list=Array.isArray(data)?data:(data&&Array.isArray(data.leads)?data.leads:null);
+  if(!list){toast("No leads found in that file.");return}
+  const isBackup=data&&data.format==="pipeline-backup-v1";
+  if(isBackup){
+    if(leads.length&&!confirm(`Restore this backup? It replaces the ${leads.length} leads in this browser with ${list.length} from the backup.`))return;
+    leads=list.map(normLead);
+    toast(`Backup restored: ${leads.length} leads`);
+  }else{
+    const byId=new Map(leads.map(l=>[l.id,l])), byPhone=new Map(leads.filter(l=>l.phone).map(l=>[l.phone,l]));
+    let added=0,updated=0;
+    for(const raw of list){
+      const n=normLead(raw), ex=byId.get(n.id)||(n.phone&&byPhone.get(n.phone));
+      if(ex){for(const k of ["name","phone","cert","city","state","exp","clients","spec","lang","mode","instagram","linkedin","youtube"]){if(n[k]!==""&&n[k]!=null)ex[k]=n[k]}delete ex._s;updated++}
+      else{leads.push(n);byId.set(n.id,n);if(n.phone)byPhone.set(n.phone,n);added++}
+    }
+    toast(`${added} new leads added${updated?`, ${updated} already in the list (notes kept)`:""}`);
+  }
+  shown=PAGE;save();render();
+}
+function exportBackup(){
+  if(!leads.length){toast("Nothing to back up yet.");return}
+  const clean=leads.map(({_s,...r})=>r);
+  const blob=new Blob([JSON.stringify({format:"pipeline-backup-v1",exported:new Date().toISOString(),leads:clean})],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`pipeline-backup-${TODAY}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  toast("Backup downloaded");
+}
+
+/* events */
+document.addEventListener("click",e=>{
+  if(e.target.closest("[data-stop]"))return;
+  const r=e.target.closest("[data-id]");if(r&&!e.target.closest(".drawer")){openLead(r.dataset.id);return}
+  const st=e.target.closest(".stage");if(st){stageFilter=stageFilter===st.dataset.s?null:st.dataset.s;shown=PAGE;render()}
+});
+$("scrim").onclick=closeLead;
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape")closeLead();
+  const tag=document.activeElement.tagName;
+  if(e.key==="/"&&!["INPUT","TEXTAREA","SELECT"].includes(tag)){e.preventDefault();$("q").focus()}
+  if((e.key==="Enter"||e.key===" ")&&document.activeElement.matches("tr[data-id],.tcard,.kcard")){e.preventDefault();openLead(document.activeElement.dataset.id)}
+});
+let qt;$("q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{q=e.target.value;shown=PAGE;render()},150)};
+function setView(v){view=v;$("vTable").setAttribute("aria-pressed",v==="table");$("vKanban").setAttribute("aria-pressed",v==="kanban");$("tableView").hidden=v!=="table";$("kanbanView").hidden=v!=="kanban";render()}
+$("vTable").onclick=()=>setView("table");$("vKanban").onclick=()=>setView("kanban");
+$("importBtn").onclick=$("welcomeImport").onclick=()=>$("file").click();
+$("file").onchange=e=>{const f=e.target.files[0];if(f)handleFile(f);e.target.value=""};
+$("backupBtn").onclick=exportBackup;
+$("wipe").onclick=async()=>{if(!confirm("Delete all leads, notes and statuses from this browser? Export a backup first if you need it."))return;leads=[];try{await DB.del("leads")}catch(e){}render();toast("All data deleted from this browser")};
+let dragId=null;
+document.addEventListener("dragstart",e=>{const c=e.target.closest(".kcard");if(c){dragId=c.dataset.id;e.dataTransfer.effectAllowed="move"}});
+document.addEventListener("dragover",e=>{const c=e.target.closest(".col");if(c&&dragId!==null){e.preventDefault();document.querySelectorAll(".col.over").forEach(x=>x!==c&&x.classList.remove("over"));c.classList.add("over")}});
+document.addEventListener("drop",e=>{const c=e.target.closest(".col");if(c&&dragId!==null){e.preventDefault();const l=leads.find(x=>x.id===dragId);dragId=null;if(l&&l.status!==c.dataset.s){l.status=c.dataset.s;l.updated=new Date().toISOString();save();render();toast(`${l.name} moved to ${l.status}`)}}});
+document.addEventListener("dragend",()=>{dragId=null;document.querySelectorAll(".col.over").forEach(x=>x.classList.remove("over"))});
+
+/* boot */
+(async()=>{
+  try{const saved=await DB.get("leads");if(Array.isArray(saved))leads=saved.map(normLead)}
+  catch(e){storageOk=false;$("saveInfo").textContent="This browser is blocking storage, so changes won't be kept. Export a backup before closing."}
+  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+  render();
+})();
+</script>
+</body>
+</html>
