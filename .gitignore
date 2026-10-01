@@ -1,0 +1,9 @@
+# Never commit contact data or backups
+*.json
+*.csv
+*.xlsx
+*.xls
+*.txt
+!README.md
+data/
+backups/
