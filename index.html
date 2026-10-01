@@ -156,7 +156,7 @@ footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin
     </div>
     <button class="btn" id="importBtn">Import leads</button>
     <button class="btn" id="backupBtn">Export backup</button>
-    <input type="file" id="file" accept=".json,application/json" hidden>
+    <input type="file" id="file" accept=".json,.xlsx,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
   </header>
 
   <div id="appBody" hidden>
@@ -183,7 +183,7 @@ footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin
 
   <section class="welcome glass" id="welcome" hidden>
     <h2>Start with your leads file</h2>
-    <p>Import the clean leads file or a backup. Everything stays in this browser on this device.</p>
+    <p>Import the clean leads file (Excel or JSON) or a backup. Everything stays in this browser on this device.</p>
     <button class="btn primary" id="welcomeImport">Import leads</button>
   </section>
 
@@ -229,7 +229,7 @@ function save(){clearTimeout(saveTimer);saveTimer=setTimeout(async()=>{try{await
 /* state */
 let view="table",stageFilter=null,q="",shown=PAGE;
 function normLead(x){return{
-  id:String(x.id||x.phone||Math.random().toString(36).slice(2)),
+  id:String(x.id||(x.phone?"p"+String(x.phone).replace(/\D/g,"").slice(-10):"")||Math.random().toString(36).slice(2)),
   name:String(x.name||"").trim(),phone:String(x.phone||"").replace(/\D/g,"").slice(-10),
   cert:x.cert||"",city:x.city||"",state:x.state||"",exp:x.exp??null,clients:x.clients??null,
   spec:x.spec||"",lang:x.lang||"",mode:x.mode||"",
@@ -295,10 +295,83 @@ function closeLead(){if(!$("drawer").classList.contains("on"))return;$("drawer")
 let tt;function toast(m){$("toast").textContent=m;$("toast").classList.add("on");clearTimeout(tt);tt=setTimeout(()=>$("toast").classList.remove("on"),2200)}
 
 /* import / backup */
+/* Excel (.xlsx) reader: no external library, runs fully in the browser */
+async function readXlsx(buf){
+  const u8=new Uint8Array(buf), dv=new DataView(buf);
+  let eocd=-1;for(let i=u8.length-22;i>=Math.max(0,u8.length-66000);i--){if(dv.getUint32(i,true)===0x06054b50){eocd=i;break}}
+  if(eocd<0)throw new Error("not a zip");
+  const n=dv.getUint16(eocd+10,true);let p=dv.getUint32(eocd+16,true);const files={};
+  const td=new TextDecoder();
+  for(let k=0;k<n;k++){
+    if(dv.getUint32(p,true)!==0x02014b50)break;
+    const method=dv.getUint16(p+10,true),csize=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),el=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),off=dv.getUint32(p+42,true);
+    const name=td.decode(u8.subarray(p+46,p+46+nl));files[name]={method,csize,off};p+=46+nl+el+cl;
+  }
+  async function read(name){
+    const f=files[name];if(!f)return null;
+    const lnl=dv.getUint16(f.off+26,true),lel=dv.getUint16(f.off+28,true),start=f.off+30+lnl+lel;
+    const data=u8.subarray(start,start+f.csize);
+    if(f.method===0)return td.decode(data);
+    if(f.method!==8)throw new Error("unsupported compression");
+    const ds=new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return await new Response(ds).text();
+  }
+  const xml=t=>new DOMParser().parseFromString(t,"application/xml");
+  let sheetPath="xl/worksheets/sheet1.xml";
+  try{
+    const wb=xml(await read("xl/workbook.xml")),rels=xml(await read("xl/_rels/workbook.xml.rels"));
+    const first=wb.getElementsByTagName("sheet")[0];
+    const rid=first.getAttribute("r:id")||first.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id");
+    for(const r of rels.getElementsByTagName("Relationship")){if(r.getAttribute("Id")===rid){let t=r.getAttribute("Target");sheetPath=t.startsWith("/")?t.slice(1):"xl/"+t.replace(/^\.\//,"");break}}
+  }catch(e){}
+  if(!files[sheetPath])sheetPath=Object.keys(files).find(k=>/^xl\/worksheets\/sheet\d+\.xml$/.test(k));
+  if(!sheetPath)throw new Error("no sheet");
+  const shared=[];const ssT=await read("xl/sharedStrings.xml");
+  if(ssT){for(const si of xml(ssT).getElementsByTagName("si")){let t="";for(const x of si.getElementsByTagName("t"))t+=x.textContent;shared.push(t)}}
+  const colIdx=ref=>{let c=0;for(const ch of ref.replace(/\d+/g,""))c=c*26+(ch.charCodeAt(0)-64);return c-1};
+  const rows=[];
+  for(const row of xml(await read(sheetPath)).getElementsByTagName("row")){
+    const arr=[];
+    for(const c of row.getElementsByTagName("c")){
+      const t=c.getAttribute("t"),v=c.getElementsByTagName("v")[0];let val="";
+      if(t==="s"&&v)val=shared[+v.textContent]??"";
+      else if(t==="inlineStr"){for(const x of c.getElementsByTagName("t"))val+=x.textContent}
+      else if(v){val=v.textContent;if(t!=="str"&&t!=="b"&&/^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(val)){const num=Number(val);val=Number.isInteger(num)||Math.abs(num)>1e6?String(Math.round(num)):String(num)}}
+      arr[colIdx(c.getAttribute("r")||"A")]=val;
+    }
+    rows.push(arr);
+  }
+  return rows;
+}
+const COLS={id:["lead id","id"],name:["coach name","name","full name"],phone:["mobile no","mobile","phone","phone number","mobile number","contact"],cert:["certifications","certification","certs"],city:["city"],state:["state"],exp:["experience (yrs)","experience","exp"],clients:["clients trained","clients"],spec:["specialization","specialisation"],lang:["languages","language"],mode:["mode","modality"],instagram:["instagram"],linkedin:["linkedin"],youtube:["youtube"],status:["status"],follow:["follow-up","follow up","followup"],notes:["notes"],tags:["tags"]};
+function rowsToLeads(rows){
+  const hi=rows.findIndex(r=>r&&r.some(v=>v&&COLS.name.concat(COLS.phone).includes(String(v).trim().toLowerCase())));
+  if(hi<0)return null;
+  const head=rows[hi].map(h=>String(h||"").trim().toLowerCase()),map={};
+  for(const [k,names] of Object.entries(COLS)){const i=head.findIndex(h=>names.includes(h));if(i>=0)map[k]=i}
+  if(map.name==null&&map.phone==null)return null;
+  const out=[];
+  for(const r of rows.slice(hi+1)){
+    if(!r)continue;const g=k=>map[k]!=null?String(r[map[k]]??"").trim():"";
+    if(!g("name")&&!g("phone"))continue;
+    const num=v=>v===""||isNaN(+v)?null:+v;
+    out.push({id:g("id")||undefined,name:g("name"),phone:g("phone"),cert:g("cert"),city:g("city"),state:g("state"),exp:num(g("exp")),clients:num(g("clients")),spec:g("spec"),lang:g("lang"),mode:g("mode"),instagram:g("instagram"),linkedin:g("linkedin"),youtube:g("youtube"),status:g("status"),follow:g("follow"),notes:g("notes"),tags:g("tags")?g("tags").split(",").map(t=>t.trim()).filter(Boolean):[]});
+  }
+  return out;
+}
+
 async function handleFile(file){
-  let data;
-  try{data=JSON.parse(await file.text())}catch(e){toast("That file isn't valid JSON. Pick leads_clean.json or a backup file.");return}
-  const list=Array.isArray(data)?data:(data&&Array.isArray(data.leads)?data.leads:null);
+  let data,list;
+  const isXlsx=/\.xlsx$/i.test(file.name);
+  if(isXlsx){
+    if(typeof DecompressionStream==="undefined"){toast("This browser can't read Excel files. Update Chrome or Edge, or import the JSON file.");return}
+    toast("Reading Excel file…");
+    try{list=rowsToLeads(await readXlsx(await file.arrayBuffer()))}catch(e){toast("Couldn't read that Excel file. Save it as .xlsx and try again.");return}
+    if(!list){toast("No 'Coach Name' or 'Mobile No' column found in the first sheet.");return}
+  }else{
+    try{data=JSON.parse(await file.text())}catch(e){toast("That file isn't valid JSON or Excel. Pick the leads file or a backup.");return}
+    list=Array.isArray(data)?data:(data&&Array.isArray(data.leads)?data.leads:null);
+  }
   if(!list){toast("No leads found in that file.");return}
   const isBackup=data&&data.format==="pipeline-backup-v1";
   if(isBackup){
